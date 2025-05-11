@@ -20,12 +20,25 @@ const io = new Server(server, {
 const rooms = {};
 const games = {};
 
+// Define allowed piece types for dice
+const DICE_PIECES = ['pawn', 'knight', 'bishop', 'rook', 'queen'];
+
 // API endpoint to create a new room
 app.post('/api/create-room', (req, res) => {
   const roomId = uuidv4().substring(0, 8); // Generate shorter room ID for ease of use
-  rooms[roomId] = { players: [], gameState: null };
+  // Store game mode in room data (default to standard if not specified)
+  const gameMode = req.body.gameMode || 'standard';
   
-  res.json({ roomId });
+  rooms[roomId] = { 
+    players: [], 
+    gameState: null,
+    gameMode: gameMode,  // Store the game mode in room data
+    diceResults: {},     // Store dice results for each player
+    currentTurn: null,   // Track whose turn it is
+    rerollRequest: null  // Track re-roll requests
+  };
+  
+  res.json({ roomId, gameMode });
 });
 
 // API endpoint to check if a room exists
@@ -40,7 +53,11 @@ app.get('/api/check-room/:roomId', (req, res) => {
     return res.status(400).json({ exists: true, full: true, message: 'Room is full' });
   }
   
-  res.json({ exists: true, full: false });
+  res.json({ 
+    exists: true, 
+    full: false,
+    gameMode: rooms[roomId].gameMode  // Return the game mode in the response
+  });
 });
 
 // Socket.IO connection handling
@@ -50,10 +67,10 @@ io.on('connection', (socket) => {
   // Join room event
   socket.on('join-room', ({ roomId, playerName }) => {
     console.log(`Player ${playerName} joining room ${roomId}`);
-
+    
     // Check if player is already in the room
     const existingPlayerIndex = rooms[roomId].players.findIndex(player => player.id === socket.id);
-
+    
     const isAnExistingPlayer = existingPlayerIndex !== -1;
     
     // Check if the room exists
@@ -78,7 +95,8 @@ io.on('connection', (socket) => {
       socket.emit('room-joined', { 
         roomId, 
         color: rooms[roomId].players[existingPlayerIndex].color, 
-        players: rooms[roomId].players
+        players: rooms[roomId].players,
+        gameMode: rooms[roomId].gameMode  // Include the game mode
       });
       return;
     }
@@ -102,7 +120,8 @@ io.on('connection', (socket) => {
     socket.emit('room-joined', { 
       roomId, 
       color: playerColor, 
-      players: rooms[roomId].players
+      players: rooms[roomId].players,
+      gameMode: rooms[roomId].gameMode  // Include the game mode
     });
     
     // If this is the second player, initialize the game
@@ -110,16 +129,156 @@ io.on('connection', (socket) => {
       // Initialize the game with starting position in FEN notation
       const initialFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
       rooms[roomId].gameState = initialFen;
+      rooms[roomId].currentTurn = 'white'; // White moves first
       
       // Notify all players in the room that the game is starting
       io.to(roomId).emit('game-start', {
         fen: initialFen,
-        players: rooms[roomId].players
+        players: rooms[roomId].players,
+        gameMode: rooms[roomId].gameMode  // Include the game mode
       });
     } else {
       // Notify the room that a player is waiting
       socket.to(roomId).emit('player-joined', { player });
     }
+  });
+
+  // Handle dice rolling for dice chess mode
+  socket.on('roll-dice', ({ roomId }) => {
+    // Check if room exists and game mode is dice-chess
+    if (!rooms[roomId] || rooms[roomId].gameMode !== 'dice-chess') {
+      socket.emit('dice-error', { message: 'Invalid room or game mode' });
+      return;
+    }
+    
+    // Find player in room
+    const playerIndex = rooms[roomId].players.findIndex(player => player.id === socket.id);
+    if (playerIndex === -1) {
+      socket.emit('dice-error', { message: 'Player not found in room' });
+      return;
+    }
+    
+    const player = rooms[roomId].players[playerIndex];
+    const playerColor = player.color;
+    
+    // Check if it's the player's turn
+    if (rooms[roomId].currentTurn !== playerColor) {
+      socket.emit('dice-error', { message: 'Not your turn to roll dice' });
+      return;
+    }
+    
+    // Clear any existing re-roll request
+    rooms[roomId].rerollRequest = null;
+    
+    // Roll three dice - pick random pieces
+    const diceResults = Array(3).fill(0).map(() => {
+      const randomIndex = Math.floor(Math.random() * DICE_PIECES.length);
+      return DICE_PIECES[randomIndex];
+    });
+    
+    // Store dice results for the current player
+    rooms[roomId].diceResults[playerColor] = diceResults;
+    
+    console.log(`Player ${playerColor} rolled: ${diceResults.join(', ')}`);
+    
+    // Emit dice result to the player
+    socket.emit('dice-result', { diceResults });
+    // Inform opponent about dice roll (without showing results)
+    socket.to(roomId).emit('opponent-rolled-dice', { color: playerColor });
+  });
+
+  // Handle re-roll request
+  socket.on('request-reroll', ({ roomId, reason }) => {
+    // Check if room exists and game mode is dice-chess
+    if (!rooms[roomId] || rooms[roomId].gameMode !== 'dice-chess') {
+      socket.emit('dice-error', { message: 'Invalid room or game mode' });
+      return;
+    }
+    
+    // Find player in room
+    const playerIndex = rooms[roomId].players.findIndex(player => player.id === socket.id);
+    if (playerIndex === -1) {
+      socket.emit('dice-error', { message: 'Player not found in room' });
+      return;
+    }
+    
+    const player = rooms[roomId].players[playerIndex];
+    const playerColor = player.color;
+    
+    // Check if it's the player's turn
+    if (rooms[roomId].currentTurn !== playerColor) {
+      socket.emit('dice-error', { message: 'Not your turn to request a re-roll' });
+      return;
+    }
+    
+    // Check if dice have been rolled
+    if (!rooms[roomId].diceResults[playerColor] || rooms[roomId].diceResults[playerColor].length === 0) {
+      socket.emit('dice-error', { message: 'You need to roll the dice first before requesting a re-roll' });
+      return;
+    }
+    
+    // Store re-roll request
+    rooms[roomId].rerollRequest = {
+      playerId: socket.id,
+      playerColor: playerColor,
+      reason: reason
+    };
+    
+    console.log(`Player ${playerColor} requested a re-roll. Reason: ${reason}`);
+    
+    // Notify the opponent about the re-roll request
+    socket.to(roomId).emit('reroll-requested', { 
+      color: playerColor,
+      reason: reason,
+      playerName: player.name
+    });
+    
+    // Confirm to the requesting player that their request was sent
+    socket.emit('reroll-request-sent');
+  });
+  
+  // Handle re-roll response
+  socket.on('respond-to-reroll', ({ roomId, approved }) => {
+    // Check if room exists and has an active re-roll request
+    if (!rooms[roomId] || !rooms[roomId].rerollRequest) {
+      socket.emit('dice-error', { message: 'No active re-roll request' });
+      return;
+    }
+    
+    // Find player in room
+    const playerIndex = rooms[roomId].players.findIndex(player => player.id === socket.id);
+    if (playerIndex === -1) {
+      socket.emit('dice-error', { message: 'Player not found in room' });
+      return;
+    }
+    
+    const player = rooms[roomId].players[playerIndex];
+    const requester = rooms[roomId].players.find(p => p.id === rooms[roomId].rerollRequest.playerId);
+    
+    if (!requester) {
+      socket.emit('dice-error', { message: 'Requesting player not found' });
+      return;
+    }
+    
+    if (approved) {
+      // Notify the requester that their re-roll was approved
+      io.to(requester.id).emit('reroll-response', { 
+        approved: true,
+        responderName: player.name
+      });
+      
+      // Clear dice results to allow re-rolling
+      rooms[roomId].diceResults[requester.color] = [];
+    } else {
+      // Notify the requester that their re-roll was denied
+      io.to(requester.id).emit('reroll-response', { 
+        approved: false,
+        responderName: player.name
+      });
+    }
+    
+    // Clear the re-roll request
+    rooms[roomId].rerollRequest = null;
   });
 
   // Handle chess moves
@@ -131,8 +290,60 @@ io.on('connection', (socket) => {
       return;
     }
     
+    // Get player color
+    const playerIndex = rooms[roomId].players.findIndex(player => player.id === socket.id);
+    if (playerIndex === -1) {
+      socket.emit('move-error', { message: 'Player not found in room' });
+      return;
+    }
+    const playerColor = rooms[roomId].players[playerIndex].color;
+    
+    // Check if it's dice chess mode
+    if (rooms[roomId].gameMode === 'dice-chess') {
+      // Check if dice have been rolled
+      const diceResults = rooms[roomId].diceResults[playerColor];
+      if (!diceResults || diceResults.length === 0) {
+        socket.emit('move-error', { message: 'You must roll the dice before moving' });
+        return;
+      }
+      
+      // Get the piece type from the move
+      // Move.piece is a property from chess.js move object that contains the piece type
+      const movedPieceType = move.piece;
+      
+      // Convert chess.js piece notation to our dice pieces format
+      // chess.js uses 'p' for pawn, 'n' for knight, etc.
+      const pieceTypeMap = {
+        'p': 'pawn',
+        'n': 'knight',
+        'b': 'bishop',
+        'r': 'rook',
+        'q': 'queen',
+        'k': 'king'
+      };
+      
+      const normalizedPieceType = pieceTypeMap[movedPieceType];
+      
+      // Check if the moved piece type is allowed by the dice roll
+      if (!diceResults.includes(normalizedPieceType)) {
+        socket.emit('move-error', { 
+          message: `You can only move ${diceResults.join(', ')} based on your dice roll` 
+        });
+        return;
+      }
+      
+      // Clear dice results after a valid move
+      rooms[roomId].diceResults[playerColor] = [];
+      
+      // Clear any re-roll request
+      rooms[roomId].rerollRequest = null;
+    }
+    
     // Update game state
     rooms[roomId].gameState = newFen;
+    
+    // Update current turn
+    rooms[roomId].currentTurn = playerColor === 'white' ? 'black' : 'white';
     
     // Broadcast the move to the other player
     socket.to(roomId).emit('opponent-move', { move, newFen });

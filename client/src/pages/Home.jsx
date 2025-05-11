@@ -8,6 +8,7 @@ const Home = () => {
   const [showJoinForm, setShowJoinForm] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [gameMode, setGameMode] = useState('standard');
 
   const navigate = useNavigate();
   const { socket, connected } = useSocket();
@@ -28,6 +29,7 @@ const Home = () => {
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ gameMode }),
       });
 
       const data = await response.json();
@@ -35,7 +37,7 @@ const Home = () => {
       if (data.roomId) {
         // Navigate to the game room
         navigate(`/game/${data.roomId}`, { 
-          state: { playerName, isCreator: true }
+          state: { playerName, isCreator: true, gameMode: data.gameMode }
         });
       } else {
         setError('Failed to create room');
@@ -78,7 +80,7 @@ const Home = () => {
       if (data.exists && !data.full) {
         // Room exists and is not full, navigate to it
         navigate(`/game/${roomId}`, { 
-          state: { playerName, isCreator: false }
+          state: { playerName, isCreator: false, gameMode: data.gameMode }
         });
       } else if (data.full) {
         setError('This room is full');
@@ -109,6 +111,36 @@ const Home = () => {
             disabled={loading}
           />
         </div>
+
+        {!showJoinForm && (
+          <div className="form-group">
+            <label>Game Mode</label>
+            <div className="radio-group">
+              <label>
+                <input
+                  type="radio"
+                  name="gameMode"
+                  value="standard"
+                  checked={gameMode === 'standard'}
+                  onChange={() => setGameMode('standard')}
+                  disabled={loading}
+                />
+                Standard Chess
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="gameMode"
+                  value="dice-chess"
+                  checked={gameMode === 'dice-chess'}
+                  onChange={() => setGameMode('dice-chess')}
+                  disabled={loading}
+                />
+                Dice Chess
+              </label>
+            </div>
+          </div>
+        )}
 
         {!connected && (
           <div className="error">

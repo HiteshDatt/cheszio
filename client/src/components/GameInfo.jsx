@@ -8,7 +8,8 @@ const GameInfo = ({
   isPlayerTurn, 
   gameState,
   gameOver,
-  waitingForOpponent
+  waitingForOpponent,
+  gameMode = 'standard'
 }) => {
   const [clipboardMessage, setClipboardMessage] = useState('');
   const [timer, setTimer] = useState(null);
@@ -65,6 +66,16 @@ const GameInfo = ({
     return isPlayerTurn ? 'Your turn' : "Opponent's turn";
   };
   
+  // Get formatted game mode
+  const getGameModeDisplay = () => {
+    if (gameMode === 'standard') {
+      return 'Standard Chess';
+    } else if (gameMode === 'dice-chess') {
+      return 'Dice Chess';
+    }
+    return gameMode;
+  };
+  
   return (
     <div className="game-info card">
       <div className="room-info">
@@ -75,6 +86,10 @@ const GameInfo = ({
         {clipboardMessage && (
           <div className="clipboard-message">{clipboardMessage}</div>
         )}
+      </div>
+      
+      <div className="game-mode-info">
+        <span>Mode: {getGameModeDisplay()}</span>
       </div>
       
       <div className="players-info">

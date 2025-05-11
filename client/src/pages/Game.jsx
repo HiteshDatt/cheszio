@@ -4,6 +4,7 @@ import { useSocket } from '../contexts/SocketContext';
 import { Chess } from 'chess.js';
 import ChessBoard from '../components/ChessBoard';
 import GameInfo from '../components/GameInfo';
+import DiceDisplay from '../components/DiceDisplay';
 
 const Game = () => {
   const { roomId } = useParams();
@@ -14,6 +15,7 @@ const Game = () => {
   // Get player name from location state
   const playerName = location.state?.playerName || 'Guest';
   const isCreator = location.state?.isCreator || false;
+  const gameMode = location.state?.gameMode || 'standard';
 
   // Game state
   const [players, setPlayers] = useState([]);
@@ -24,6 +26,15 @@ const Game = () => {
   const [gameOver, setGameOver] = useState(false);
   const [gameState, setGameState] = useState(null);
   const [error, setError] = useState('');
+  
+  // Dice chess state
+  const [diceResults, setDiceResults] = useState([]);
+  const [opponentRolled, setOpponentRolled] = useState(false);
+  
+  // Re-roll request state
+  const [rerollRequestSent, setRerollRequestSent] = useState(false);
+  const [incomingRerollRequest, setIncomingRerollRequest] = useState(null);
+  const [rerollResponseReceived, setRerollResponseReceived] = useState(null);
 
   // Connect to the room when the component mounts
   useEffect(() => {
@@ -40,6 +51,16 @@ const Game = () => {
     socket.on('player-left', handlePlayerLeft);
     socket.on('game-ended', handleGameEnded);
     socket.on('room-error', handleRoomError);
+    
+    // Dice chess events
+    socket.on('dice-result', handleDiceResult);
+    socket.on('opponent-rolled-dice', handleOpponentRolledDice);
+    socket.on('dice-error', handleDiceError);
+    
+    // Re-roll request events
+    socket.on('reroll-requested', handleRerollRequested);
+    socket.on('reroll-request-sent', handleRerollRequestSent);
+    socket.on('reroll-response', handleRerollResponse);
 
     // Clean up event listeners on unmount
     return () => {
@@ -50,6 +71,12 @@ const Game = () => {
       socket.off('player-left');
       socket.off('game-ended');
       socket.off('room-error');
+      socket.off('dice-result');
+      socket.off('opponent-rolled-dice');
+      socket.off('dice-error');
+      socket.off('reroll-requested');
+      socket.off('reroll-request-sent');
+      socket.off('reroll-response');
     };
   }, [socket, connected, roomId, playerName]);
 
@@ -57,6 +84,12 @@ const Game = () => {
   const handleRoomJoined = (data) => {
     setPlayerColor(data.color);
     setPlayers(data.players);
+    // Store game mode received from server
+    // data.gameMode may be undefined if this is an existing room,
+    // so fallback to the gameMode from location state
+    if (data.gameMode) {
+      // This is just for consistency, as we're already using location.state.gameMode
+    }
   };
 
   // Handle another player joining
@@ -72,6 +105,61 @@ const Game = () => {
     setGameOver(false);
     setGameState(null);
     setCurrentTurn('white');
+    // Reset dice state
+    setDiceResults([]);
+    setOpponentRolled(false);
+    // Reset re-roll state
+    setRerollRequestSent(false);
+    setIncomingRerollRequest(null);
+    setRerollResponseReceived(null);
+  };
+
+  // Handle dice roll result
+  const handleDiceResult = ({ diceResults }) => {
+    setDiceResults(diceResults);
+    // Clear re-roll request state when new dice are rolled
+    setRerollRequestSent(false);
+    setRerollResponseReceived(null);
+  };
+
+  // Handle opponent rolling dice
+  const handleOpponentRolledDice = () => {
+    setOpponentRolled(true);
+  };
+
+  // Handle dice error
+  const handleDiceError = ({ message }) => {
+    setError(message);
+    // Clear error after 3 seconds
+    setTimeout(() => setError(''), 3000);
+  };
+  
+  // Handle incoming re-roll request
+  const handleRerollRequested = (data) => {
+    setIncomingRerollRequest(data);
+  };
+  
+  // Handle confirmation that re-roll request was sent
+  const handleRerollRequestSent = () => {
+    setRerollRequestSent(true);
+  };
+  
+  // Handle response to re-roll request
+  const handleRerollResponse = (data) => {
+    setRerollResponseReceived(data);
+    setRerollRequestSent(false);
+    
+    // If approved, dice will be cleared on the server and we'll need to re-roll
+    if (data.approved) {
+      setDiceResults([]);
+    }
+    
+    // Clear the response after 5 seconds if it was denied
+    if (!data.approved) {
+      setTimeout(() => {
+        setRerollResponseReceived(null);
+      }, 5000);
+    }
   };
 
   // Handle opponent moves
@@ -81,6 +169,15 @@ const Game = () => {
     // Update turn
     const chess = new Chess(newFen);
     setCurrentTurn(chess.turn() === 'w' ? 'white' : 'black');
+    
+    // Reset dice-related state for the next turn
+    setDiceResults([]);
+    setOpponentRolled(false);
+    
+    // Reset re-roll state
+    setRerollRequestSent(false);
+    setIncomingRerollRequest(null);
+    setRerollResponseReceived(null);
     
     // Check if the game is over
     checkGameStatus(chess);
@@ -112,9 +209,36 @@ const Game = () => {
     }, 3000);
   };
 
+  // Handle dice roll
+  const handleRollDice = () => {
+    if (!socket || !gameStarted || gameOver || !isPlayerTurn) return;
+    
+    socket.emit('roll-dice', { roomId });
+  };
+  
+  // Handle re-roll request
+  const handleRequestReroll = (reason) => {
+    if (!socket || !gameStarted || gameOver || !isPlayerTurn || diceResults.length === 0) return;
+    
+    socket.emit('request-reroll', { roomId, reason });
+  };
+  
+  // Handle response to re-roll request
+  const handleRespondToReroll = (approved) => {
+    if (!socket || !gameStarted || gameOver || !incomingRerollRequest) return;
+    
+    socket.emit('respond-to-reroll', { roomId, approved });
+    setIncomingRerollRequest(null);
+  };
+
   // Handle the player making a move
   const handleMove = (move, newFen) => {
     if (!socket || !gameStarted || gameOver) return;
+    
+    // In dice chess mode, validate move against dice results
+    if (gameMode === 'dice-chess' && diceResults.length > 0) {
+      // Move validation will be done on the server
+    }
     
     // Send the move to the server
     socket.emit('move', {
@@ -129,6 +253,14 @@ const Game = () => {
     // Update turn
     const chess = new Chess(newFen);
     setCurrentTurn(chess.turn() === 'w' ? 'white' : 'black');
+    
+    // Reset dice state
+    setDiceResults([]);
+    
+    // Reset re-roll state
+    setRerollRequestSent(false);
+    setIncomingRerollRequest(null);
+    setRerollResponseReceived(null);
     
     // Check if the game is over
     checkGameStatus(chess);
@@ -157,6 +289,15 @@ const Game = () => {
   // Wait for opponent
   const waitingForOpponent = players.length < 2;
 
+  // Determine if player can roll dice
+  const canRollDice = gameMode === 'dice-chess' && 
+                      isPlayerTurn && 
+                      !gameOver && 
+                      gameStarted && 
+                      diceResults.length === 0 && 
+                      !rerollRequestSent && 
+                      !(rerollResponseReceived && !rerollResponseReceived.approved);
+
   return (
     <div className="page-container">
       {error && <div className="error">{error}</div>}
@@ -169,7 +310,24 @@ const Game = () => {
         gameState={gameState}
         gameOver={gameOver}
         waitingForOpponent={waitingForOpponent}
+        gameMode={gameMode}
       />
+      
+      {gameMode === 'dice-chess' && (
+        <DiceDisplay
+          diceResults={diceResults}
+          canRollDice={canRollDice}
+          onRollDice={handleRollDice}
+          playerColor={playerColor}
+          opponentRolled={opponentRolled}
+          gameMode={gameMode}
+          onRequestReroll={handleRequestReroll}
+          rerollRequestSent={rerollRequestSent}
+          rerollResponseReceived={rerollResponseReceived}
+          incomingRerollRequest={incomingRerollRequest}
+          onRespondToReroll={handleRespondToReroll}
+        />
+      )}
       
       <div className="chess-game-container">
         {playerColor && (
@@ -177,8 +335,10 @@ const Game = () => {
             position={position}
             onMove={handleMove}
             playerColor={playerColor}
-            isPlayerTurn={isPlayerTurn}
+            isPlayerTurn={isPlayerTurn && (gameMode !== 'dice-chess' || diceResults.length > 0)}
             gameOver={gameOver}
+            diceResults={diceResults}
+            gameMode={gameMode}
           />
         )}
       </div>

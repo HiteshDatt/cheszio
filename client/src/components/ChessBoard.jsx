@@ -7,11 +7,14 @@ const ChessBoard = ({
   onMove,
   playerColor,
   isPlayerTurn,
-  gameOver
+  gameOver,
+  diceResults = [],
+  gameMode = 'standard'
 }) => {
   const [board, setBoard] = useState([]);
   const [selectedSquare, setSelectedSquare] = useState(null);
   const [validMoves, setValidMoves] = useState([]);
+  const [validPieces, setValidPieces] = useState([]); // Track valid pieces for dice mode
   const chessRef = useRef(null);
   
   // Initialize chess board
@@ -19,6 +22,34 @@ const ChessBoard = ({
     chessRef.current = new Chess(position);
     updateBoard();
   }, [position]);
+  
+  // Update valid pieces that can be moved based on dice results
+  useEffect(() => {
+    if (gameMode !== 'dice-chess' || diceResults.length === 0) {
+      setValidPieces([]);
+      return;
+    }
+    
+    // Map chess.js piece types to dice piece types
+    const pieceTypeMap = {
+      'p': 'pawn',
+      'n': 'knight',
+      'b': 'bishop',
+      'r': 'rook',
+      'q': 'queen',
+      'k': 'king'
+    };
+
+    // Get reversed mapping for validation
+    const reversePieceTypeMap = {};
+    for (const [key, value] of Object.entries(pieceTypeMap)) {
+      reversePieceTypeMap[value] = key;
+    }
+
+    // Convert dice results to chess.js piece types
+    const allowedPieceTypes = diceResults.map(type => reversePieceTypeMap[type]);
+    setValidPieces(allowedPieceTypes);
+  }, [diceResults, gameMode]);
   
   // Update the visual board based on current position
   const updateBoard = () => {
@@ -112,6 +143,13 @@ const ChessBoard = ({
     // Otherwise check if the square contains a piece of the player's color
     const piece = chessRef.current.get(position);
     if (piece && piece.color === playerColor.charAt(0)) {
+      // In dice chess mode, check if this piece type is allowed by the dice roll
+      if (gameMode === 'dice-chess' && validPieces.length > 0) {
+        if (!validPieces.includes(piece.type)) {
+          return; // Cannot select this piece based on dice roll
+        }
+      }
+      
       setSelectedSquare(position);
       
       // Calculate valid moves
@@ -140,6 +178,16 @@ const ChessBoard = ({
     
     if (validMoves.includes(square.position)) {
       classes.push('valid-move');
+    }
+    
+    // For dice chess mode, highlight pieces that can be moved based on dice roll
+    if (gameMode === 'dice-chess' && square.piece && isPlayerTurn && validPieces.length > 0) {
+      const pieceType = square.piece.charAt(1); // Get piece type ('p', 'n', etc.)
+      const pieceColor = square.piece.charAt(0); // Get piece color ('w', 'b')
+      
+      if (validPieces.includes(pieceType) && pieceColor === playerColor.charAt(0)) {
+        classes.push('allowed-by-dice');
+      }
     }
     
     return classes.join(' ');
