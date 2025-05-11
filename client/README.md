@@ -24,6 +24,21 @@ This is the frontend application for a real-time chess game. It allows players t
 npm install
 ```
 
+## Environment Variables
+
+The application uses environment variables for configuration. Create a `.env` file in the client directory with the following variables:
+
+```
+# Backend API URL
+VITE_API_URL=http://localhost:3001
+```
+
+For production deployment, update the API URL to point to your deployed backend:
+
+```
+VITE_API_URL=https://your-api-domain.com
+```
+
 ## Running the Client
 
 For development:

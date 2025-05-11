@@ -4,8 +4,8 @@ import { io } from 'socket.io-client';
 // Create context
 const SocketContext = createContext();
 
-// Server URL
-const SERVER_URL = 'http://localhost:3001';
+// Server URL from environment variable or fallback to localhost
+const SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);

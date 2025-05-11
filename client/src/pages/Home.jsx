@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../contexts/SocketContext';
 
+// Get API URL from environment variables or use fallback
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 const Home = () => {
   const [playerName, setPlayerName] = useState('');
   const [roomId, setRoomId] = useState('');
@@ -24,7 +27,7 @@ const Home = () => {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:3001/api/create-room', {
+      const response = await fetch(`${API_URL}/api/create-room`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -68,7 +71,7 @@ const Home = () => {
     setError('');
 
     try {
-      const response = await fetch(`http://localhost:3001/api/check-room/${roomId}`, {
+      const response = await fetch(`${API_URL}/api/check-room/${roomId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
