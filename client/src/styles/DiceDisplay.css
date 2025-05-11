@@ -172,7 +172,7 @@
   gap: var(--spacing-xs);
 }
 
-.request-reroll-button:hover {
+.request-reroll-button:hover:not(:disabled) {
   background-color: #e59400;
   transform: translateY(-1px);
 }
@@ -346,4 +346,61 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.opponent-dice-results {
+  margin: var(--spacing-md) 0;
+  padding: var(--spacing-md);
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: var(--border-radius-md);
+  border-left: 4px solid var(--info);
+}
+
+.opponent-dice-results p {
+  margin-bottom: var(--spacing-md);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.opponent-piece .piece-image {
+  opacity: 0.8;
+}
+
+.reroll-options {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+
+.request-reroll-button, 
+.request-reroll-with-reason-button {
+  background-color: var(--warning);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+}
+
+.request-reroll-button:hover, 
+.request-reroll-with-reason-button:hover {
+  background-color: #e59400;
+  transform: translateY(-1px);
+}
+
+.request-reroll-with-reason-button {
+  background-color: var(--secondary-color);
+  margin-top: var(--spacing-sm);
+}
+
+.request-reroll-with-reason-button:hover {
+  background-color: var(--secondary-dark);
 } 

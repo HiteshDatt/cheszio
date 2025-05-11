@@ -29,6 +29,7 @@ const Game = () => {
   
   // Dice chess state
   const [diceResults, setDiceResults] = useState([]);
+  const [opponentDiceResults, setOpponentDiceResults] = useState(null);
   const [opponentRolled, setOpponentRolled] = useState(false);
   
   // Re-roll request state
@@ -107,6 +108,7 @@ const Game = () => {
     setCurrentTurn('white');
     // Reset dice state
     setDiceResults([]);
+    setOpponentDiceResults(null);
     setOpponentRolled(false);
     // Reset re-roll state
     setRerollRequestSent(false);
@@ -117,14 +119,20 @@ const Game = () => {
   // Handle dice roll result
   const handleDiceResult = ({ diceResults }) => {
     setDiceResults(diceResults);
+    // Also make these results available to the opponent
+    socket.emit('opponent-dice-results', { roomId, diceResults });
     // Clear re-roll request state when new dice are rolled
     setRerollRequestSent(false);
     setRerollResponseReceived(null);
   };
 
   // Handle opponent rolling dice
-  const handleOpponentRolledDice = () => {
+  const handleOpponentRolledDice = ({ color, diceResults }) => {
     setOpponentRolled(true);
+    // Store opponent's dice results if provided
+    if (diceResults) {
+      setOpponentDiceResults(diceResults);
+    }
   };
 
   // Handle dice error
@@ -172,6 +180,7 @@ const Game = () => {
     
     // Reset dice-related state for the next turn
     setDiceResults([]);
+    setOpponentDiceResults(null);
     setOpponentRolled(false);
     
     // Reset re-roll state
@@ -256,6 +265,7 @@ const Game = () => {
     
     // Reset dice state
     setDiceResults([]);
+    setOpponentDiceResults(null);
     
     // Reset re-roll state
     setRerollRequestSent(false);
@@ -298,36 +308,53 @@ const Game = () => {
                       !rerollRequestSent && 
                       !(rerollResponseReceived && !rerollResponseReceived.approved);
 
+  // Add socket event handlers for opponent dice results
+  useEffect(() => {
+    if (!socket) return;
+    
+    // Listen for opponent dice results
+    socket.on('opponent-dice-results', ({ diceResults }) => {
+      setOpponentDiceResults(diceResults);
+    });
+    
+    return () => {
+      socket.off('opponent-dice-results');
+    };
+  }, [socket]);
+
   return (
     <div className="page-container">
       {error && <div className="error">{error}</div>}
       
-      <GameInfo
-        roomId={roomId}
-        playerColor={playerColor}
-        players={players}
-        isPlayerTurn={isPlayerTurn}
-        gameState={gameState}
-        gameOver={gameOver}
-        waitingForOpponent={waitingForOpponent}
-        gameMode={gameMode}
-      />
-      
-      {gameMode === 'dice-chess' && (
-        <DiceDisplay
-          diceResults={diceResults}
-          canRollDice={canRollDice}
-          onRollDice={handleRollDice}
+      <div className="game-info-container">
+        <GameInfo
+          roomId={roomId}
           playerColor={playerColor}
-          opponentRolled={opponentRolled}
+          players={players}
+          isPlayerTurn={isPlayerTurn}
+          gameState={gameState}
+          gameOver={gameOver}
+          waitingForOpponent={waitingForOpponent}
           gameMode={gameMode}
-          onRequestReroll={handleRequestReroll}
-          rerollRequestSent={rerollRequestSent}
-          rerollResponseReceived={rerollResponseReceived}
-          incomingRerollRequest={incomingRerollRequest}
-          onRespondToReroll={handleRespondToReroll}
         />
-      )}
+        
+        {gameMode === 'dice-chess' && (
+          <DiceDisplay
+            diceResults={diceResults}
+            canRollDice={canRollDice}
+            onRollDice={handleRollDice}
+            playerColor={playerColor}
+            opponentRolled={opponentRolled}
+            gameMode={gameMode}
+            onRequestReroll={handleRequestReroll}
+            rerollRequestSent={rerollRequestSent}
+            rerollResponseReceived={rerollResponseReceived}
+            incomingRerollRequest={incomingRerollRequest}
+            onRespondToReroll={handleRespondToReroll}
+            opponentDiceResults={opponentDiceResults}
+          />
+        )}
+      </div>
       
       <div className="chess-game-container">
         {playerColor && (

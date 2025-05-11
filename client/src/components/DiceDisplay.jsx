@@ -13,7 +13,8 @@ const DiceDisplay = ({
   rerollRequestSent,
   rerollResponseReceived,
   incomingRerollRequest,
-  onRespondToReroll
+  onRespondToReroll,
+  opponentDiceResults
 }) => {
   const [rerollReason, setRerollReason] = useState("");
   const [showReasonInput, setShowReasonInput] = useState(false);
@@ -29,17 +30,17 @@ const DiceDisplay = ({
   };
 
   // Get image path for each piece type
-  const getPieceImage = (pieceType) => {
-    return `/pieces/${playerColor}_${pieceType}.svg`;
+  const getPieceImage = (pieceType, color = playerColor) => {
+    return `/pieces/${color}_${pieceType}.svg`;
   };
   
   // Handle re-roll request submission
   const handleRerollRequest = () => {
-    if (rerollReason.trim()) {
-      onRequestReroll(rerollReason);
-      setShowReasonInput(false);
-      setRerollReason("");
-    }
+    // Use a default message if no reason is provided
+    const reason = rerollReason.trim() || "No legal moves available";
+    onRequestReroll(reason);
+    setShowReasonInput(false);
+    setRerollReason("");
   };
   
   // Toggle reason input visibility
@@ -48,6 +49,11 @@ const DiceDisplay = ({
     if (!showReasonInput) {
       setRerollReason("");
     }
+  };
+
+  // Direct reroll request without reason
+  const handleDirectRerollRequest = () => {
+    onRequestReroll("No legal moves available");
   };
   
   // Handle response to incoming re-roll request
@@ -98,7 +104,25 @@ const DiceDisplay = ({
         </div>
       )}
       
-      {opponentRolled && !diceResults.length && (
+      {/* Opponent's dice results */}
+      {opponentDiceResults && opponentDiceResults.length > 0 && (
+        <div className="opponent-dice-results">
+          <p>Opponent can move one of these pieces:</p>
+          <div className="dice-pieces">
+            {opponentDiceResults.map((piece, index) => (
+              <div key={index} className="dice-piece opponent-piece">
+                <div 
+                  className="piece-image opponent-piece-image"
+                  style={{ backgroundImage: `url(${getPieceImage(piece, playerColor === 'white' ? 'black' : 'white')})` }}
+                ></div>
+                <div className="piece-name">{getPieceDisplayName(piece)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {opponentRolled && !diceResults.length && !opponentDiceResults && (
         <div className="opponent-rolled">
           Opponent rolled their dice!
         </div>
@@ -119,20 +143,28 @@ const DiceDisplay = ({
             ))}
           </div>
           
-          {/* Re-roll request option */}
-          {!rerollRequestSent && !rerollResponseReceived && !showReasonInput && (
-            <button 
-              className="request-reroll-button"
-              onClick={toggleReasonInput}
-            >
-              Request Re-roll
-            </button>
+          {/* Re-roll request options */}
+          {!rerollRequestSent && !rerollResponseReceived && (
+            <div className="reroll-options">
+              <button 
+                className="request-reroll-button"
+                onClick={handleDirectRerollRequest}
+              >
+                Request Re-roll
+              </button>
+              <button 
+                className="request-reroll-with-reason-button"
+                onClick={toggleReasonInput}
+              >
+                Add Reason
+              </button>
+            </div>
           )}
           
           {/* Re-roll reason input */}
           {showReasonInput && (
             <div className="reroll-reason-container">
-              <p>Why do you need to re-roll?</p>
+              <p>Why do you need to re-roll? (Optional)</p>
               <textarea
                 value={rerollReason}
                 onChange={(e) => setRerollReason(e.target.value)}
@@ -143,7 +175,6 @@ const DiceDisplay = ({
                 <button 
                   className="submit-reason-button"
                   onClick={handleRerollRequest}
-                  disabled={!rerollReason.trim()}
                 >
                   Submit Request
                 </button>

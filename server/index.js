@@ -183,8 +183,33 @@ io.on('connection', (socket) => {
     
     // Emit dice result to the player
     socket.emit('dice-result', { diceResults });
-    // Inform opponent about dice roll (without showing results)
-    socket.to(roomId).emit('opponent-rolled-dice', { color: playerColor });
+    // Inform opponent about dice roll (now including the results)
+    socket.to(roomId).emit('opponent-rolled-dice', { 
+      color: playerColor,
+      diceResults: diceResults
+    });
+  });
+
+  // Forward dice results to opponent
+  socket.on('opponent-dice-results', ({ roomId, diceResults }) => {
+    // Check if room exists and game mode is dice-chess
+    if (!rooms[roomId] || rooms[roomId].gameMode !== 'dice-chess') {
+      return;
+    }
+    
+    // Find player in room
+    const playerIndex = rooms[roomId].players.findIndex(player => player.id === socket.id);
+    if (playerIndex === -1) {
+      return;
+    }
+    
+    const player = rooms[roomId].players[playerIndex];
+    const playerColor = player.color;
+    
+    // Forward dice results to opponent
+    socket.to(roomId).emit('opponent-dice-results', { 
+      diceResults 
+    });
   });
 
   // Handle re-roll request
