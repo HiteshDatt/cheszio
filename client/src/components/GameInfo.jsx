@@ -13,6 +13,7 @@ const GameInfo = ({
 }) => {
   const [clipboardMessage, setClipboardMessage] = useState('');
   const [timer, setTimer] = useState(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Clear clipboard message after a time period
   useEffect(() => {
@@ -88,37 +89,51 @@ const GameInfo = ({
     
     return isPlayerTurn ? 'status-your-turn' : 'status-opponent-turn';
   };
+
+  // Toggle collapse state
+  const toggleCollapse = () => {
+    setIsCollapsed(!isCollapsed);
+  };
   
   return (
-    <div className="game-info card">
+    <div className={`game-info card ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="game-info-header">
         <h3>Chess Game</h3>
-      </div>
-      
-      <div className="room-info">
-        <h3>Room Code</h3>
-        <div className="room-id">{roomId}</div>
-        <button onClick={copyRoomId} className="copy-button">
-          Copy
+        <button 
+          className="collapse-button" 
+          onClick={toggleCollapse}
+          aria-label={isCollapsed ? "Expand game info" : "Collapse game info"}
+        >
+          {isCollapsed ? '▼' : '▲'}
         </button>
-        {clipboardMessage && (
-          <div className="clipboard-message">{clipboardMessage}</div>
-        )}
       </div>
       
-      <div className="game-mode-info">
-        <span>Mode:</span>
-        <span className="game-mode-badge">{getGameModeDisplay()}</span>
-      </div>
-      
-      <div className="players-info">
-        <div className={`player ${playerColor === 'white' ? 'current-player' : ''}`}>
-          <div className="player-color white"></div>
-          <span>{getPlayerName('white')}</span>
+      <div className="collapsible-content">
+        <div className="room-info">
+          <h3>Room Code</h3>
+          <div className="room-id">{roomId}</div>
+          <button onClick={copyRoomId} className="copy-button">
+            Copy
+          </button>
+          {clipboardMessage && (
+            <div className="clipboard-message">{clipboardMessage}</div>
+          )}
         </div>
-        <div className={`player ${playerColor === 'black' ? 'current-player' : ''}`}>
-          <div className="player-color black"></div>
-          <span>{getPlayerName('black')}</span>
+        
+        <div className="game-mode-info">
+          <span>Mode:</span>
+          <span className="game-mode-badge">{getGameModeDisplay()}</span>
+        </div>
+        
+        <div className="players-info">
+          <div className={`player ${playerColor === 'white' ? 'current-player' : ''}`}>
+            <div className="player-color white"></div>
+            <span>{getPlayerName('white')}</span>
+          </div>
+          <div className={`player ${playerColor === 'black' ? 'current-player' : ''}`}>
+            <div className="player-color black"></div>
+            <span>{getPlayerName('black')}</span>
+          </div>
         </div>
       </div>
       
