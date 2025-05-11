@@ -116,7 +116,7 @@ const Home = () => {
           <div className="form-group">
             <label>Game Mode</label>
             <div className="radio-group">
-              <label>
+              <label className="radio-option">
                 <input
                   type="radio"
                   name="gameMode"
@@ -125,9 +125,9 @@ const Home = () => {
                   onChange={() => setGameMode('standard')}
                   disabled={loading}
                 />
-                Standard Chess
+                <span className="radio-label">Standard Chess</span>
               </label>
-              <label>
+              <label className="radio-option">
                 <input
                   type="radio"
                   name="gameMode"
@@ -136,7 +136,7 @@ const Home = () => {
                   onChange={() => setGameMode('dice-chess')}
                   disabled={loading}
                 />
-                Dice Chess
+                <span className="radio-label">Dice Chess</span>
               </label>
             </div>
           </div>
@@ -156,12 +156,14 @@ const Home = () => {
               <button 
                 onClick={handleCreateRoom} 
                 disabled={loading || !connected}
+                className="primary-button"
               >
                 {loading ? 'Creating...' : 'Create Room'}
               </button>
               <button 
                 onClick={() => setShowJoinForm(true)}
                 disabled={loading || !connected}
+                className="secondary-button"
               >
                 Join Room
               </button>
@@ -170,13 +172,13 @@ const Home = () => {
         ) : (
           <form onSubmit={handleJoinRoom}>
             <div className="form-group">
-              <label htmlFor="roomId">Room ID</label>
+              <label htmlFor="roomId">Room Code</label>
               <input
                 type="text"
                 id="roomId"
                 value={roomId}
                 onChange={(e) => setRoomId(e.target.value)}
-                placeholder="Enter room ID"
+                placeholder="Enter room code"
                 disabled={loading}
               />
             </div>
@@ -184,6 +186,7 @@ const Home = () => {
               <button 
                 type="submit" 
                 disabled={loading || !connected}
+                className="primary-button"
               >
                 {loading ? 'Joining...' : 'Join'}
               </button>
@@ -191,6 +194,7 @@ const Home = () => {
                 type="button" 
                 onClick={() => setShowJoinForm(false)}
                 disabled={loading}
+                className="secondary-button"
               >
                 Back
               </button>
