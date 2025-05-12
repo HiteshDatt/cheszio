@@ -49,7 +49,7 @@ app.get('/api/check-room/:roomId', (req, res) => {
     return res.status(404).json({ exists: false, message: 'Room not found' });
   }
   
-  if (rooms[roomId].players.length >= 2) {
+  if (rooms[roomId]?.players?.length >= 2) {
     return res.status(400).json({ exists: true, full: true, message: 'Room is full' });
   }
   
