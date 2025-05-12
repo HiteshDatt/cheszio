@@ -60,4 +60,5 @@ The server runs on port 3001 by default, but you can change it by setting the PO
 - **opponent-move**: Receive opponent's move
 - **player-joined**: Notification when another player joins
 - **player-left**: Notification when a player disconnects
-- **game-ended**: Game end notification with result 
+- **game-ended**: Game end notification with result
+
