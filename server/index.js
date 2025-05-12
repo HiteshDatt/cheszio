@@ -69,7 +69,7 @@ io.on('connection', (socket) => {
     console.log(`Player ${playerName} joining room ${roomId}`);
     
     // Check if player is already in the room
-    const existingPlayerIndex = rooms[roomId].players.findIndex(player => player.id === socket.id);
+    const existingPlayerIndex = rooms[roomId]?.players?.findIndex(player => player?.id === socket?.id);
     
     const isAnExistingPlayer = existingPlayerIndex !== -1;
     
